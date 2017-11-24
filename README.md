@@ -1,8 +1,8 @@
 # Driver for the ams CCS811 digital gas sensor for monitoring indoor air quality.
 
-This driver is written for usage with the ESP8266 and FreeRTOS (esp-open-rtos) using the I2C interface driver.
+The driver is for the usage with the ESP8266 and [esp-open-rtos](https://github.com/SuperHouse/esp-open-rtos). 
 
-The driver is also working with ESP32 and ESP-IDF using a wrapper for ESP8266 functions, see folder ```components/esp8266_wrapper```.
+It is also working with ESP32 and [ESP-IDF](https://github.com/espressif/esp-idf.git) using a wrapper component for ESP8266 functions, see folder ```components/esp8266_wrapper```, as well as Linux based systems using a wrapper library.
 
 ## About the sensor
 
