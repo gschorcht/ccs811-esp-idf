@@ -10,7 +10,7 @@
  *
  * The BSD License (3-clause license)
  *
- * Copyright (c) 2017 Gunar Schorcht (https://github.com/gschorcht]
+ * Copyright (c) 2017 Gunar Schorcht (https://github.com/gschorcht)
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,28 +42,6 @@
 
 #include <string.h>
 #include <stdlib.h>
-
-#if !defined(ESP_PLATFORM) && !defined(ESP_OPEN_RTOS) && !defined(__linux__)
-#define ESP_OPEN_RTOS 1
-#endif
-
-#if ESP_OPEN_RTOS  // ESP8266
-#include "FreeRTOS.h"
-#include "task.h"
-#include "espressif/esp_common.h"
-#include "espressif/sdk_private.h"
-#include "i2c/i2c.h"
-
-#elif ESP_PLATFORM  // ESP32 (ESP-IDF)
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp8266_wrapper.h"
-#include <errno.h>
-
-#else  // __linux__
-#include "esp8266_wrapper.h"
-#include <errno.h>
-#endif
 
 #include "ccs811.h"
 

@@ -14,6 +14,8 @@ The CCS811 is an ultra-low power digital sensor which detects **Volatile Organic
 - correct baseline automatically or manually
 - connect a NTC thermistor to provide means of calculating the local ambient temperature.
 
+The sensor uses an I2C interface and supports clock stretching. See the notes on clock stretching during I2C interface intialization.
+
 ## Measurement Process
 
 ### Sensor modes
@@ -32,7 +34,7 @@ After power up, the sensor starts automatically in *Idle, Low Current Mode* (```
 
 **Please note:** In *Constant Power Mode* with measurements every 250 ms (```mode_250ms```) only raw data are available. In all other measurement modes, the Indoor Air Quality (IAQ) values are available additionally. The *Constant Power Mode* with measurements every 250 ms (```mode_250ms```) is only intended for systems where an external host system wants to run an algorithm with raw data.
 
-Once the is initialized with function ```ccs811_init_sensor```, function ```ccs811_set_mode``` can be used to start periodic measurements with a given period.
+Once the sensor is initialized with function ```ccs811_init_sensor```, function ```ccs811_set_mode``` can be used to start periodic measurements with a given period.
 
 ```
 static ccs811_sensor_t* sensor;
@@ -217,7 +219,7 @@ Following figure shows the hardware configuration if no interrupt is used.
   +------------------------+    +--------+
   | ESP8266  Bus 0         |    | CCS811 |
   |          GPIO 5 (SCL)  >----> SCL    |
-  |          GPIO 4 (SDA)  ------ SDA    |
+  |          GPIO 4 (SDA)  <----> SDA    |
   |          GND           -----> /WAKE  |
   +------------------------+    +--------+
 ```
@@ -228,7 +230,7 @@ If interrupt signal *nINT* is used to fetch new data, additionally the interrupt
   +------------------------+    +--------+
   | ESP8266  Bus 0         |    | CCS811 |
   |          GPIO 5 (SCL)  >----> SCL    |
-  |          GPIO 4 (SDA)  ------ SDA    |
+  |          GPIO 4 (SDA)  <----> SDA    |
   |          GPIO 2        <----- /nINT  |
   |          GND           -----> /WAKE  |
   +------------------------+    +--------+
@@ -240,12 +242,12 @@ If CCS811 sensor is used in conjunction with another sensor, e.g., a SHT3x senso
   +------------------------+       +--------+
   | ESP8266  Bus 0         |       | CCS811 |
   |          GPIO 5 (SCL)  >--+----> SCL    |
-  |          GPIO 4 (SDA)  ---|-+--- SDA    |
+  |          GPIO 4 (SDA)  <--|-+--> SDA    |
   |          GND           ---|-|--> /WAKE  |
   |                        |  | |  +--------+
   |                        |  | |  | SHT3x  |
   |                        |  +----> SCL    |
-  |                        |    +--- SDA    |
+  |                        |    +--> SDA    |
   +------------------------+       +--------+
 ```
 
@@ -261,16 +263,18 @@ Dependent on the hardware configuration, the communication interface settings ha
 
 // define GPIO for interrupt
 #define INT_GPIO      2
-#include "sht3x/sht3x.h"
 ```
 
 ### Main program
 
 Before using the CCS811 driver, function ```i2c_init``` needs to be called for each I2C interface to setup them.
 
+**Please note:** CCS811 uses clock streching that can be longer than the default I2C clock stretching. Therefore the clock stretching parameter of I2C has to be set to at least ```CCS811_I2C_CLOCK_STRETCH```.
+
 ```
 ...
-i2c_init(I2C_BUS, I2C_SCL_PIN, I2C_SDA_PIN, I2C_FREQ_100K))
+i2c_init(I2C_BUS, I2C_SCL_PIN, I2C_SDA_PIN, I2C_FREQ_100K);
+i2c_set_clock_stretch (I2C_BUS, CCS811_I2C_CLOCK_STRETCH);
 ...
 ```
 
@@ -503,6 +507,9 @@ void user_init(void)
 
     // init all I2C bus interfaces at which CCS811 sensors are connected
     i2c_init(I2C_BUS, I2C_SCL_PIN, I2C_SDA_PIN, I2C_FREQ_100K);
+
+    // longer clock stretching is required for CCS811
+    i2c_set_clock_stretch (I2C_BUS, CCS811_I2C_CLOCK_STRETCH);
 
     // init the sensor with slave address CCS811_I2C_ADDRESS_1 connected I2C_BUS.
     sensor = ccs811_init_sensor (I2C_BUS, CCS811_I2C_ADDRESS_1);

@@ -10,7 +10,7 @@
  *
  * The BSD License (3-clause license)
  *
- * Copyright (c) 2017 Gunar Schorcht (https://github.com/gschorcht]
+ * Copyright (c) 2017 Gunar Schorcht (https://github.com/gschorcht)
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,6 +49,8 @@
 
 #include "stdint.h"
 #include "stdbool.h"
+
+#include "ccs811_platform.h"
 
 // CCS811 I2C addresses
 #define CCS811_I2C_ADDRESS_1      0x5A      // default

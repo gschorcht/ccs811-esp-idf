@@ -6,57 +6,30 @@
  *
  * Harware configuration:
  *
- * +------------------------+    +--------+
- * | ESP8266  Bus 0         |    | CCS811 |
- * |          GPIO 5 (SCL)  >----> SCL    |
- * |          GPIO 4 (SDA)  ------ SDA    |
- * |          GPIO 13       <----- /nINT  |
- * |          GND           -----> /WAKE  |
- * +------------------------+    +--------+
+ *   +---------------+   +----------+       +---------------+   +----------+
+ *   | ESP8266       |   | CCS811   |       | ESP32         |   | CCS811   |
+ *   |               |   |          |       |               |   |          |
+ *   | GPIO 5 (SCL)  ----> SCL      |       | GPIO 16 (SCL) ----> SCL      |
+ *   | GPIO 4 (SDA)  <---> SDA      |       | GPIO 17 (SDA) <---> SDA      |
+ *   | GPIO 13       <---- INT1     |       | GPIO 22       <---- INT1     |
+ *   | GND           ----> /WAKE    |       | GND           ----> /WAKE    |
+ *   +---------------+   +----------+       +---------------+   +----------+
  *
- * +------------------------+    +--------+
- * | ESP32    Bus 0         |    | CCS811 |
- * |          GPIO 16 (SCL) >----> SCL    |
- * |          GPIO 17 (SDA) ------ SDA    |
- * |          GPIO 22       <----- /nINT  |
- * |          GND           -----> /WAKE  |
- * +------------------------+    +--------+
  */
 
 // use following constants to define the demo mode
 // #define INT_DATA_RDY_USED
 // #define INT_THRESHOLD_USED
 
-/* -- platform dependent includes ----------------------------- */
+#if defined(INT_DATA_RDY_USED) || defined(INT_THRESHOLD_USED)
+#define INT_USED
+#endif
 
-#ifdef ESP_PLATFORM  // ESP32 (ESP-IDF)
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-
-#include "driver/gpio.h"
-#include "esp8266_wrapper.h"
+/* -- includes ---------------------------------------------------- */
 
 #include "ccs811.h"
 
-#else  // ESP8266 (esp-open-rtos)
-
-#include <stdio.h>
-
-#include "espressif/esp_common.h"
-#include "espressif/sdk_private.h"
-
-#include "esp/uart.h"
-#include "i2c/i2c.h"
-
-#include "FreeRTOS.h"
-#include "task.h"
-
-#include "ccs811/ccs811.h"
-
-#endif
-
-/** -- platform dependent definitions ------------------------------ */
+/* -- platform dependent definitions ------------------------------ */
 
 #ifdef ESP_PLATFORM  // ESP32 (ESP-IDF)
 
@@ -85,7 +58,6 @@
 
 // define GPIOs for interrupt
 #define nINT_PIN      13
-#define INT2_PIN      12
 
 #endif  // ESP_PLATFORM
 
@@ -93,7 +65,7 @@
 
 static ccs811_sensor_t* sensor;
 
-#if defined(INT_DATA_RDY_USED) || defined(INT_THRESHOLD_USED)
+#ifdef INT_USED
 /**
  * In this example, the interrupt *nINT* is used. It is triggered every time
  * new data are available (INT_DATA_RDY_USED) or exceed defined thresholds
@@ -127,16 +99,12 @@ void user_task_interrupt (void *pvParameters)
 
 // Interrupt handler which resumes user_task_interrupt on interrupt
 
-#ifdef ESP_PLATFORM  // ESP32 (ESP-IDF)
-static void IRAM_ATTR nINT_handler(void* arg)
-#else  // ESP8266 (esp-open-rtos)
-void nINT_handler (uint8_t gpio)
-#endif
+static void IRAM nINT_handler(uint8_t gpio)
 {
     xTaskResumeFromISR (nINT_task);
 }
 
-#else
+#else // !INT_USED
 
 /*
  * In this example, user task fetches the sensor values every seconds.
@@ -164,20 +132,13 @@ void user_task_periodic(void *pvParameters)
     }
 }
 
-#endif
+#endif // INT_USED
 
-
-#ifdef ESP_PLATFORM  // ESP32 (ESP-IDF)
-void app_main()
-#else  // ESP8266 (esp-open-rtos)
 void user_init(void)
-#endif
 {
-    #ifdef ESP_OPEN_RTOS  // ESP8266
     // Set UART Parameter.
     uart_set_baud(0, 115200);
-    #endif
-
+    // Give the UART some time to settle
     vTaskDelay(1);
 
     /** -- MANDATORY PART -- */
@@ -185,50 +146,37 @@ void user_init(void)
     // init all I2C bus interfaces at which CCS811 sensors are connected
     i2c_init (I2C_BUS, I2C_SCL_PIN, I2C_SDA_PIN, I2C_FREQ);
     
-    #ifdef ESP_OPEN_RTOS
     // longer clock stretching is required for CCS811
     i2c_set_clock_stretch (I2C_BUS, CCS811_I2C_CLOCK_STRETCH);
-    #endif
 
     // init the sensor with slave address CCS811_I2C_ADDRESS_1 connected I2C_BUS.
     sensor = ccs811_init_sensor (I2C_BUS, CCS811_I2C_ADDRESS_1);
 
     if (sensor)
     {
-        #if defined(INT_DATA_RDY_USED) || defined(INT_THRESHOLD_USED)
-
-        // create a task that is resumed by interrupt handler to use the sensor
-        xTaskCreate(user_task_interrupt, "user_task_interrupt", TASK_STACK_DEPTH, NULL, 2, &nINT_task);
-
-        #ifdef ESP_PLATFORM  // ESP32 (ESP-IDF)
-        gpio_config_t gpio_cfg = {
-            .pin_bit_mask = (1 << nINT_PIN),
-            .mode = GPIO_MODE_INPUT,
-            .pull_up_en = true,
-            .intr_type = GPIO_INTR_NEGEDGE
-        };
-        gpio_config(&gpio_cfg);
-        gpio_install_isr_service(0);
-        gpio_isr_handler_add(nINT_PIN, nINT_handler, (void*)nINT_PIN);
-        #else  // ESP8266 (esp-open-rtos)
-        // activate the interrupt for nINT_PIN and set the interrupt handler
-        gpio_set_interrupt(nINT_PIN, GPIO_INTTYPE_EDGE_NEG, nINT_handler);
-        #endif
-
-        #ifdef INT_DATA_RDY_USED
-        // enable the data ready interrupt
-        ccs811_enable_interrupt (sensor, true);
-        #else
-        // set threshold parameters and enable threshold interrupt mode
-        ccs811_set_eco2_thresholds (sensor, 600, 1100, 40);
-        #endif
-
-        #else
+        #if !defined (INT_USED)
 
         // create a periodic task that uses the sensor
         xTaskCreate(user_task_periodic, "user_task_periodic", TASK_STACK_DEPTH, NULL, 2, NULL);
 
+        #else // INT_USED
+
+        // create a task that is resumed by interrupt handler to use the sensor
+        xTaskCreate(user_task_interrupt, "user_task_interrupt", TASK_STACK_DEPTH, NULL, 2, &nINT_task);
+
+        // activate the interrupt for nINT_PIN and set the interrupt handler
+        gpio_enable(nINT_PIN, GPIO_INPUT);
+        gpio_set_interrupt(nINT_PIN, GPIO_INTTYPE_EDGE_NEG, nINT_handler);
+
+        #ifdef INT_DATA_RDY_USED
+        // enable the data ready interrupt
+        ccs811_enable_interrupt (sensor, true);
+        #else // INT_THRESHOLD_USED
+        // set threshold parameters and enable threshold interrupt mode
+        ccs811_set_eco2_thresholds (sensor, 600, 1100, 40);
         #endif
+
+        #endif  // !defined(INT_USED)
 
         // start periodic measurement with one measurement per second
         ccs811_set_mode (sensor, ccs811_mode_1s);
