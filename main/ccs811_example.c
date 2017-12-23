@@ -6,18 +6,18 @@
  *
  * Harware configuration:
  *
- *   +---------------+   +----------+       +---------------+   +----------+
- *   | ESP8266       |   | CCS811   |       | ESP32         |   | CCS811   |
- *   |               |   |          |       |               |   |          |
- *   | GPIO 5 (SCL)  ----> SCL      |       | GPIO 16 (SCL) ----> SCL      |
- *   | GPIO 4 (SDA)  <---> SDA      |       | GPIO 17 (SDA) <---> SDA      |
- *   | GPIO 13       <---- INT1     |       | GPIO 22       <---- INT1     |
- *   | GND           ----> /WAKE    |       | GND           ----> /WAKE    |
- *   +---------------+   +----------+       +---------------+   +----------+
- *
+ *   +-----------------+   +----------+
+ *   | ESP8266 / ESP32 |   | CCS811   |
+ *   |                 |   |          |
+ *   |   GPIO 14 (SCL) ----> SCL      |
+ *   |   GPIO 13 (SDA) <---> SDA      |
+ *   |   GPIO 5        <---- INT1     |
+ *   |   GND           ----> /WAKE    |
+ *   +-----------------+   +----------+
  */
 
-// use following constants to define the demo mode
+/* -- use following constants to define the example mode ----------- */
+
 // #define INT_DATA_RDY_USED
 // #define INT_THRESHOLD_USED
 
@@ -25,43 +25,34 @@
 #define INT_USED
 #endif
 
-/* -- includes ---------------------------------------------------- */
+/* -- includes ----------------------------------------------------- */
 
 #include "ccs811.h"
 
-/* -- platform dependent definitions ------------------------------ */
+/* -- platform dependent definitions ------------------------------- */
 
 #ifdef ESP_PLATFORM  // ESP32 (ESP-IDF)
 
-// user task stack depth
+// user task stack depth for ESP32
 #define TASK_STACK_DEPTH 2048
-
-// define I2C interfaces for L3GD20H sensors
-#define I2C_BUS       0
-#define I2C_SCL_PIN   16
-#define I2C_SDA_PIN   17
-#define I2C_FREQ      100000
-
-// define GPIOs for interrupt
-#define nINT_PIN      22
 
 #else  // ESP8266 (esp-open-rtos)
 
-// user task stack depth
+// user task stack depth for ESP8266
 #define TASK_STACK_DEPTH 256
-
-// define I2C interfaces for L3GD20H sensors
-#define I2C_BUS       0
-#define I2C_SCL_PIN   5
-#define I2C_SDA_PIN   4
-#define I2C_FREQ      I2C_FREQ_100K
-
-// define GPIOs for interrupt
-#define nINT_PIN      13
 
 #endif  // ESP_PLATFORM
 
-/* -- user tasks ---------------------------------------------- */
+// I2C interface defintions for ESP32 and ESP8266
+#define I2C_BUS       0
+#define I2C_SCL_PIN   14
+#define I2C_SDA_PIN   13
+#define I2C_FREQ      I2C_FREQ_100K
+
+// interrupt GPIOs defintions for ESP8266 and ESP32
+#define nINT_PIN      13
+
+/* -- user tasks --------------------------------------------------- */
 
 static ccs811_sensor_t* sensor;
 
@@ -133,6 +124,8 @@ void user_task_periodic(void *pvParameters)
 }
 
 #endif // INT_USED
+
+/* -- main program ------------------------------------------------- */
 
 void user_init(void)
 {
